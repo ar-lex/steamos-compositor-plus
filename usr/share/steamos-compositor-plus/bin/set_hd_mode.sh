@@ -30,6 +30,7 @@ function first_by_prefix_order() {
 GOODMODES=("3840x2160" "2560x1440" "1920x1080" "1280x720")
 GOODRATES=("60.0" "59.9") # CEA modes guarantee or one the other, but not both?
 ROTATION=
+OUTPUT_NAME=
 
 CONFIG_PATH=${XDG_CONFIG_HOME:-$HOME/.config}
 CONFIG_FILE="$CONFIG_PATH/steamos-compositor-plus"
@@ -41,6 +42,7 @@ else
     echo '#GOODMODES=("3840x2160" "2560x1440" "1920x1080" "1280x720")' > "$CONFIG_FILE"
     echo '#GOODRATES=("60.0" "59.9")' >> "$CONFIG_FILE"
     echo '#ROTATION=' >> "$CONFIG_FILE"
+    echo '#OUTPUT_NAME=' >> "$CONFIG_FILE"
 fi
 
 # First, some logging
@@ -49,15 +51,20 @@ xrandr --verbose
 
 # List connected outputs
 ALL_OUTPUT_NAMES=$(xrandr | grep ' connected' | cut -f1 -d' ')
-# Default to first connected output
-OUTPUT_NAME=$(echo $ALL_OUTPUT_NAMES | cut -f1 -d' ')
 
-# If any is connected, give priority to HDMI then DP
-OUTPUT_PRIORITY="HDMI DP"
-PREFERRED_OUTPUT=$(first_by_prefix_order ALL_OUTPUT_NAMES[@] OUTPUT_PRIORITY[@])
-if [[ -n "$PREFERRED_OUTPUT" ]] ; then
-    OUTPUT_NAME=$PREFERRED_OUTPUT
+# If output is not specified or is invalid
+if ! echo "$ALL_OUTPUT_NAMES" | grep -x -q "$OUTPUT_NAME"; then
+    # Default to first connected output
+    OUTPUT_NAME=$(echo $ALL_OUTPUT_NAMES | cut -f1 -d' ')
+
+    # If any is connected, give priority to HDMI then DP
+    OUTPUT_PRIORITY="HDMI DP"
+    PREFERRED_OUTPUT=$(first_by_prefix_order ALL_OUTPUT_NAMES[@] OUTPUT_PRIORITY[@])
+    if [[ -n "$PREFERRED_OUTPUT" ]] ; then
+        OUTPUT_NAME=$PREFERRED_OUTPUT
+    fi
 fi
+
 
 # Disable everything but the selected output
 for i in $ALL_OUTPUT_NAMES; do

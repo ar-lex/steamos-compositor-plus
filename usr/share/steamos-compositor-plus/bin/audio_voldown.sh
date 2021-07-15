@@ -35,7 +35,7 @@ done<<<$(pacmd list-sinks | grep -e "index:" -e "volume:")
 if $ready && [[ "$volumer" -gt $MINVOLUME ]] && [[ "$volumel" -gt $MINVOLUME ]]
 then
  pactl set-sink-volume @DEFAULT_SINK@ -$STEP
- aplay $HOME/.local/share/Steam/tenfoot/resource/sounds/volume_change.wav &>/dev/null
+ aplay $HOME/.steam/tenfoot/resource/sounds/volume_change.wav &>/dev/null
 else
- aplay $HOME/.local/share/Steam/tenfoot/resource/sounds/activation_change_fail.wav &>/dev/null
+ aplay $HOME/.steam/tenfoot/resource/sounds/activation_change_fail.wav &>/dev/null
 fi

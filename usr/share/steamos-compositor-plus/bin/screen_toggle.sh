@@ -3,73 +3,48 @@
 # Screen Toogle script
 [ -z "$DISPLAY" ] && export DISPLAY=:0
 
-active_o=""
-current_r="zzz"
-current_m=""
-list_o=""
-mirror=false
-ready=false
+# Find active output and all connected outputs
+ALL_OUTPUTS=()
+while IFS= read -r line; do
+    ALL_OUTPUTS+=("$line")
+done < <(xrandr | grep ' connected' | cut -f1 -d' ')
+ACTIVE_OUTPUT=$(xrandr | awk '/ connected/ && /[[:digit:]]x[[:digit:]].*+/{print $1}')
 
-while read line
-do
- fline=$(echo "$line" | awk '/'"$current_r"'/{print $0" M"} ; / connected/{print $1" "$3" O"} ; / disconnected/{print $1" "$3" D"} ; /Screen/{print $8$9$10",R"}')
- if [[ "$fline" =~ "R"$ ]]
- then
-  current_r="$(echo "$fline" | awk -F, '{print $1}')"
- elif [[ "$fline" =~ "O"$ ]]
- then
-  read connected_o connected_m <<<"$(echo "$fline" | awk '{print $1" "$2}')"
- elif [[ "$fline" =~ "D"$ ]]
- then
-  connected_o=""
-  connected_m=""
- elif [[ "$fline" =~ "M"$ ]]
- then
-  #output has mode, but only proceed if the monitor is connected
-  if [ -n "$connected_o" ]
-  then
-   #only add to list if it hasn't been already added
-   ! [[ "$list_o" =~ ",$connected_o"$ ]] && list_o="$list_o,$connected_o"
-   selected_m="$(echo "$fline" | awk '/*/{print $1}')"
-   if [ -n "$selected_m" ]
-   then
-    current_m="$selected_m"
-    [ -n "$active_o" ] && mirror=true && active_o=M || active_o="$connected_o"
-   fi
-  fi
- fi
-done<<<$(xrandr)
+# Find the next connected output to currently active one
+for i in "${!ALL_OUTPUTS[@]}"; do
+    if [ "${ALL_OUTPUTS[i]}" == "$ACTIVE_OUTPUT" ]; then
+        if [ $((i+1)) == "${#ALL_OUTPUTS[@]}" ]; then
+            NEXT_OUTPUT="${ALL_OUTPUTS[0]}"
+        else
+            NEXT_OUTPUT="${ALL_OUTPUTS[i+1]}"
+        fi
+    fi
+done
 
-[ -n "$current_m" ] && [ -n "$active_o" ] && ready=true
-if $ready
-then
- if $mirror
- then
-  #is mirrored, go for the first option and turn off all others
-  next_o="$(echo "$list_o" | awk -F, '{print $2}')"
-  for output in ${list_o//,/ }
-  do
-   ! [ "$output" = "$next_o" ] && xrandr --output "$output" --off
-  done
- else
-  #is single active_o
-  next_o="$(echo "$list_o" | awk -F",$active_o" '{print $2}' | awk -F, '{print $2}')"
-  if [ -n "$next_o" ]
-  then
-   #moving to next_o
-   xrandr --output "$next_o" --mode "$current_m" --same-as "$active_o"
-   xrandr --output "$active_o" --off
-  else
-   #moving to mirror
-   for output in ${list_o//,/ }
-   do
-    ! [ "$output" = "$active_o" ] && xrandr --output "$output" --mode "$current_m" --same-as "$active_o"
-   done
-  fi
- fi
-elif ! [ "$current_r" = "zzz" ]
-then
- #try to fallback to first available output if there's a valid current_r
- next_o="$(echo "$list_o" | awk -F, '{print $2}')"
- [ -n "$next_o" ] && xrandr --output "$next_o" --mode "$current_r"
+# Write next connected output to config file
+CONFIG_PATH=${XDG_CONFIG_HOME:-$HOME/.config}
+CONFIG_FILE="$CONFIG_PATH/steamos-compositor-plus"
+sed -i "s/.*OUTPUT_NAME.*/OUTPUT_NAME=$NEXT_OUTPUT/" $CONFIG_FILE
+
+# Enable next output and disable everything else
+XRANDRCMD="xrandr"
+for i in "${ALL_OUTPUTS[@]}"; do
+    if [ "$i" == "$NEXT_OUTPUT" ]; then
+        XRANDRCMD="$XRANDRCMD --output $i --auto"
+    else
+        XRANDRCMD="$XRANDRCMD --output $i --off"
+    fi
+done 
+$XRANDRCMD
+
+# Run modesetting script for changed config file
+export PATH=/usr/share/steamos-compositor-plus/bin:${PATH}
+set_hd_mode.sh >> $HOME/.set_hd_mode.log
+
+# Restart compositor
+COMPOSITORCMD="steamcompmgr"
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
 fi
+killall -w $COMPOSITORCMD
+$COMPOSITORCMD &

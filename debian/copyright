@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: steamos-compositor-plus
-Source: https://github.com/gamer-os/steamos-compositor-plus
+Source: https://github.com/ChimeraOS/steamos-compositor-plus
 
 Files: *
 Copyright: 2013 Valve Corporation <steamos@steampowered.com>
